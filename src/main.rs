@@ -33,23 +33,26 @@ fn main() {
 
     let client = Client::new();
     let mut spinner = Spinner::new(Spinners::BouncingBar, "Generating your command...".into());
-    let api_addr = format!("{}/completions", config.api_base);
+    let api_addr = format!("{}/chat/completions", config.api_base);
     let response = client
         .post(api_addr)
         .json(&json!({
-            "top_p": 1,
-            "stop": "```",
-            "temperature": 0,
-            "suffix": "\n```",
-            "max_tokens": 1000,
-            "presence_penalty": 0,
-            "frequency_penalty": 0,
             "model": "gpt-4o-mini",
-            "prompt": build_prompt(&cli.prompt.join(" ")),
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Generate a complete Bash/Zsh script for the given task. Return ONLY the raw script without any formatting, markdown, or code block indicators. Include necessary explanations as comments within the script."
+                },
+                {
+                    "role": "user",
+                    "content": build_prompt(&cli.prompt.join(" "))
+                }
+            ]
         }))
         .header("Authorization", format!("Bearer {}", config.api_key))
-        .send()
-        .unwrap();
+        .header("Content-Type", "application/json")
+        .send().unwrap();
+
 
     let status_code = response.status();
     if status_code.is_client_error() {
@@ -70,7 +73,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let code = response.json::<serde_json::Value>().unwrap()["choices"][0]["text"]
+    let code = response.json::<serde_json::Value>().unwrap()["choices"][0]["message"]["content"]
         .as_str()
         .unwrap()
         .trim()
@@ -169,5 +172,5 @@ fn build_prompt(prompt: &str) -> String {
         "".to_string()
     };
 
-    format!("{prompt}{os_hint}:\n```bash\n#!/usr/bin/env zsh\n", prompt = prompt, os_hint = os_hint)
+    format!("{prompt}{os_hint}:\n\n#!/usr/bin/env zsh\n", prompt = prompt, os_hint = os_hint)
 }
