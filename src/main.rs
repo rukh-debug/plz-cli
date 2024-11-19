@@ -41,7 +41,7 @@ fn main() {
             "messages": [
                 {
                     "role": "system",
-                    "content": "Generate a complete Bash/Zsh script for the given task. Return ONLY the raw script without any formatting, markdown, or code block indicators. Include necessary explanations as comments within the script."
+                    "content": "Generate a small Bash/Zsh script for the given task. Return ONLY the raw script without any formatting, markdown, or code block indicators. Dont include xplanations if not necessary, else include as comments within the script."
                 },
                 {
                     "role": "user",
