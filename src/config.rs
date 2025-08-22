@@ -2,21 +2,27 @@ use colored::Colorize;
 use std::{env, io::Write, process::exit};
 
 pub struct Config {
-    pub api_key: String,
-    pub api_base: String,
+    pub ollama_url: String,
+    pub ollama_model: String,
     pub shell: String,
 }
 
 impl Config {
     pub fn new() -> Self {
-        let api_key = env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
-            println!("{}", "This program requires an OpenAI API key to run. Please set the OPENAI_API_KEY environment variable. https://github.com/m1guelpf/plz-cli#usage".red());
+        let ollama_url = env::var("OLLAMA_URL").unwrap_or_else(|_| {
+            println!("{}", "Warning: OLLAMA_URL environment variable not set. Using default: https://ollama.rukh.me".yellow());
+            String::from("https://ollama.rukh.me")
+        });
+        
+        let ollama_model = env::var("OLLAMA_MODEL").unwrap_or_else(|_| {
+            println!("{}", "Error: This program requires an Ollama model to be specified. Please set the OLLAMA_MODEL environment variable (e.g., qwen2.5-coder:7b, codellama, etc.)".red());
+            println!("{}", "Available models can be listed with: ollama list".bright_black());
             exit(1);
         });
-        let api_base = env::var("OPENAI_API_BASE").unwrap_or_else(|_| String::from("https://api.openai.com/v1"));
+        
         let shell = env::var("SHELL").unwrap_or_else(|_| String::new());
 
-        Self { api_key, api_base, shell }
+        Self { ollama_url, ollama_model, shell }
     }
 
     pub fn write_to_history(&self, code: &str) {
@@ -26,14 +32,11 @@ impl Config {
             _ => return,
         };
 
-        std::fs::OpenOptions::new()
+        if let Ok(mut file) = std::fs::OpenOptions::new()
             .append(true)
             .open(history_file)
-            .map_or((), |mut file| {
-                file.write_all(format!("{code}\n").as_bytes())
-                    .unwrap_or_else(|_| {
-                        exit(1);
-                    });
-            });
+        {
+            let _ = file.write_all(format!("{code}\n").as_bytes());
+        }
     }
 }

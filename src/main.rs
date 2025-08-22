@@ -33,23 +33,23 @@ fn main() {
 
     let client = Client::new();
     let mut spinner = Spinner::new(Spinners::BouncingBar, "Generating your command...".into());
-    let api_addr = format!("{}/chat/completions", config.api_base);
+    let api_addr = format!("{}/api/chat", config.ollama_url);
     let response = client
         .post(api_addr)
         .json(&json!({
-            "model": "gpt-4o-mini",
+            "model": config.ollama_model,
             "messages": [
                 {
                     "role": "system",
-                    "content": "Generate a small Bash/Zsh script for the given task. Return ONLY the raw script without any formatting, markdown, or code block indicators. Dont include xplanations if not necessary, else include as comments within the script."
+                    "content": "Generate a small Bash/Zsh script for the given task. Return ONLY the raw script without any formatting, markdown, or code block indicators. Dont include explanations if not necessary, else include as comments within the script."
                 },
                 {
                     "role": "user",
                     "content": build_prompt(&cli.prompt.join(" "))
                 }
-            ]
+            ],
+            "stream": false
         }))
-        .header("Authorization", format!("Bearer {}", config.api_key))
         .header("Content-Type", "application/json")
         .send().unwrap();
 
@@ -57,7 +57,9 @@ fn main() {
     let status_code = response.status();
     if status_code.is_client_error() {
         let response_body = response.json::<serde_json::Value>().unwrap();
-        let error_message = response_body["error"]["message"].as_str().unwrap();
+        let error_message = response_body.get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown client error");
         spinner.stop_and_persist(
             "✖".red().to_string().as_str(),
             format!("API error: \"{error_message}\"").red().to_string(),
@@ -66,16 +68,23 @@ fn main() {
     } else if status_code.is_server_error() {
         spinner.stop_and_persist(
             "✖".red().to_string().as_str(),
-            format!("OpenAI is currently experiencing problems. Status code: {status_code}")
+            format!("Ollama server is currently experiencing problems. Status code: {status_code}")
                 .red()
                 .to_string(),
         );
         std::process::exit(1);
     }
 
-    let code = response.json::<serde_json::Value>().unwrap()["choices"][0]["message"]["content"]
+    let response_json = response.json::<serde_json::Value>().unwrap();
+    let code = response_json["message"]["content"]
         .as_str()
-        .unwrap()
+        .unwrap_or_else(|| {
+            spinner.stop_and_persist(
+                "✖".red().to_string().as_str(),
+                "Failed to parse response from Ollama".red().to_string(),
+            );
+            std::process::exit(1);
+        })
         .trim()
         .to_string();
 
